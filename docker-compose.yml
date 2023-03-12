@@ -1,0 +1,18 @@
+version: "3.0"
+
+services:
+  manel_db_qrcode:
+    image: postgres
+    container_name: manel_db_qrcode
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: manel
+      POSTGRES_DB: manel
+    ports:
+      - "54321:5432"
+    volumes:
+      - manel_db_data:/var/lib/postresql/data
+
+volumes:
+  manel_db_data:
+    external: true
