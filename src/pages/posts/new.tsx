@@ -1,15 +1,19 @@
 import React, { FC, useEffect, useState } from "react";
 
-import { type NextPage } from "next";
+import { GetStaticProps, type NextPage } from "next";
 import Head from "next/head";
-import Navbar from "@/components/Navbar";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { SwitchField } from "@/components/SwitchField";
 import { api } from "@/utils/api";
-import { FiTrash2 } from "react-icons/fi";
-import { useCloudinaryUpload } from "@/utils/cloudinary.service";
-import { SignatureType } from "@/server/api/routers/upload";
 import { FileCard } from "@/components/FileCard";
+import { useUploadAwsS3 } from "@/utils/s3.service";
+import { PresignedPost } from "aws-sdk/clients/s3";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
+
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 const Label: FC<
   {
     children: React.ReactNode;
@@ -28,11 +32,11 @@ const Label: FC<
 
 type FormValues = {
   title: string;
-  file: FileList;
+  files: FileList;
   isPublic: boolean;
 };
 
-const NewPost: NextPage = () => {
+const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
   const {
     register,
     control,
@@ -46,43 +50,66 @@ const NewPost: NextPage = () => {
     defaultValues: {
       title: "",
       isPublic: false,
-      file: {} as FileList,
+      files: {} as FileList,
     },
     mode: "onBlur",
     reValidateMode: "onBlur",
   });
 
+  const { data: sessionData } = useSession();
+  const router = useRouter();
+
+  if (!sessionData && typeof window !== "undefined") {
+    router.push("/").catch((error) => console.log(error));
+  }
+
+  const files = watch("files");
+  const file = files[0] || null;
+
   const [complete, setComplete] = useState<number>(0);
 
-  const { data: cloudinarySignature } =
-    api.upload.getCloudinarySignature.useQuery();
+  const { mutateAsync: upload } = useUploadAwsS3(setComplete);
 
-  const safeCloudinarySignature =
-    cloudinarySignature?.signature || ({} as SignatureType["signature"]);
+  const { mutate: getPresignMutation } = api.upload.getPresignUrl.useMutation({
+    onSuccess: (data) => {
+      upload({ files, ...(data as PresignedPost) })
+        .then((data) => {
+          console.log(data);
+        })
+        .catch((err) => console.log(err));
+    },
+  });
 
-  const { mutateAsync: upload, isLoading: isUploadLoading } =
-    useCloudinaryUpload(safeCloudinarySignature, setComplete);
+  const { mutate: createPost } = api.post.createPost.useMutation({
+    onSuccess: (data) => {
+      router.push("/").catch((error) => console.log(error));
+      toast("Publication créé avec succès");
+    },
+  });
 
   const onSubmit: SubmitHandler<FormValues> = (data: FormValues) => {
-    console.log("Submited form");
-    console.log(data);
+    if (!data || !data.files) return;
+
+    const fileData = files[0] as File;
+
+    createPost({
+      filename: fileData.name,
+      isPublic: data.isPublic,
+      title: data.title,
+    });
   };
 
   const resetFile = () => {
     reset({
-      file: {} as FileList,
+      files: {} as FileList,
     });
   };
 
-  const files = watch("file");
-  const file = files[0] || null;
-
   useEffect(() => {
-    console.log("Calling use effect");
     const allowedExtensions = /(\.mp4|\..avi|\..mov|\..mkv|\.mp3)$/i;
 
     if (!file) {
-      setError("file", {
+      setError("files", {
         type: "required",
         message: "Le ficher est requis",
       });
@@ -90,7 +117,7 @@ const NewPost: NextPage = () => {
     }
 
     if (!!file && !allowedExtensions.exec(file.name)) {
-      setError("file", {
+      setError("files", {
         type: "filetype",
         message:
           "Le ficher doit avoir une extension supportée. Les extensions: .mp4, .avi, .mov. .mkv ou .mp3 ",
@@ -98,18 +125,17 @@ const NewPost: NextPage = () => {
       return;
     }
 
-    if (!!file && Array.isArray(allowedExtensions.exec(file.name))) {
-      clearErrors("file");
-      upload(files).catch((e) => console.log(e));
+    if (!!file && allowedExtensions.exec(file.name)) {
+      clearErrors("files");
+      getPresignMutation({ filename: file.name });
     }
-  }, [file, setError, clearErrors]);
+  }, [file, setError, clearErrors, getPresignMutation]);
 
   return (
     <>
       <Head>
         <title>Create new post</title>
       </Head>
-      <Navbar />
       <main className="flex flex-col items-center  justify-center">
         <div className="container flex flex-col items-center justify-center gap-12 px-4 py-8 ">
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-[2rem]">
@@ -117,8 +143,8 @@ const NewPost: NextPage = () => {
           </h3>
           <div className="w-full max-w-md">
             <form noValidate onSubmit={handleSubmit(onSubmit)}>
-              <main className="flex items-center justify-center font-sans">
-                <div className="flex flex-col space-y-12">
+              <main className="flex w-full items-center justify-center font-sans">
+                <div className="flex w-full flex-col space-y-12">
                   <div>
                     <>
                       <Label htmlFor="title">titre publication</Label>
@@ -176,7 +202,7 @@ const NewPost: NextPage = () => {
                           </p>
 
                           <input
-                            {...register("file", {
+                            {...register("files", {
                               required: "Le ficher est requis",
                             })}
                             id="dropzone-file"
@@ -185,10 +211,10 @@ const NewPost: NextPage = () => {
                           />
                         </div>
                       </Label>
-                      {!!errors?.file && (
+                      {!!errors?.files && (
                         <div className="max-w-md">
                           <span className="text-md mt-1 ml-1 flex items-center font-medium tracking-wide text-red-500">
-                            {errors?.file?.message}
+                            {errors?.files?.message}
                           </span>
                         </div>
                       )}
@@ -219,6 +245,14 @@ const NewPost: NextPage = () => {
       </main>
     </>
   );
+};
+
+export const getStaticProps: GetStaticProps = () => {
+  return {
+    props: {
+      protectedProp: true,
+    },
+  };
 };
 
 export default NewPost;
