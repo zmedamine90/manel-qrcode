@@ -11,6 +11,7 @@
     "db": "prisma",
     "db:diff": "prisma diff",
     "lint": "next lint",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start"
   },
   "dependencies": {
