@@ -53,8 +53,13 @@ export const postRouter = createTRPCRouter({
 
   deletePost: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       const post = await ctx.prisma.post.findUnique({
+        select: {
+          id: true,
+          filename: true,
+          userId: true,
+        },
         where: {
           id: input.id,
         },
