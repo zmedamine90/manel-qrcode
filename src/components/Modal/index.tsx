@@ -1,5 +1,4 @@
 import { Dialog, Transition } from "@headlessui/react";
-import jsPDF from "jspdf";
 import { Fragment, useState } from "react";
 import Image from "next/image";
 
