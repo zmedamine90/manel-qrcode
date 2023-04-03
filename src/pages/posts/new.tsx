@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from "react";
+import React, { ChangeEvent, FC, useEffect, useState } from "react";
 
 import { GetStaticProps, type NextPage } from "next";
 import Head from "next/head";
@@ -11,8 +11,9 @@ import { PresignedPost } from "aws-sdk/clients/s3";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import LoadingDots from "@/components/LoadingDots";
 
 const Label: FC<
   {
@@ -40,20 +41,19 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
   const {
     register,
     control,
-    setError,
-    clearErrors,
     watch,
-    reset,
+    resetField,
+    setValue,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid, isSubmitted },
   } = useForm<FormValues>({
     defaultValues: {
       title: "",
       isPublic: false,
       files: {} as FileList,
     },
-    mode: "onBlur",
-    reValidateMode: "onBlur",
+    mode: "onChange",
+    reValidateMode: "onChange",
   });
 
   const { data: sessionData } = useSession();
@@ -68,24 +68,27 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
 
   const [complete, setComplete] = useState<number>(0);
 
-  const { mutateAsync: upload } = useUploadAwsS3(setComplete);
+  const { mutateAsync: upload, isLoading: isUploading } =
+    useUploadAwsS3(setComplete);
 
-  const { mutate: getPresignMutation } = api.upload.getPresignUrl.useMutation({
-    onSuccess: (data) => {
-      upload({ files, ...(data as PresignedPost) })
-        .then((data) => {
-          console.log(data);
-        })
-        .catch((err) => console.log(err));
-    },
-  });
+  const { mutate: getPresignMutation, isLoading: isGettingPresign } =
+    api.upload.getPresignUrl.useMutation({
+      onSuccess: (data) => {
+        upload({ files, ...(data as PresignedPost) })
+          .then((data) => {
+            console.log(data);
+          })
+          .catch((err) => console.log(err));
+      },
+    });
 
-  const { mutate: createPost } = api.post.createPost.useMutation({
-    onSuccess: (data) => {
-      router.push("/").catch((error) => console.log(error));
-      toast("Publication créé avec succès");
-    },
-  });
+  const { mutate: createPost, isLoading: isCreatingPost } =
+    api.post.createPost.useMutation({
+      onSuccess: (data) => {
+        router.push("/").catch((error) => console.log(error));
+        toast("Publication créé avec succès");
+      },
+    });
 
   const onSubmit: SubmitHandler<FormValues> = (data: FormValues) => {
     if (!data || !data.files) return;
@@ -100,36 +103,19 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
   };
 
   const resetFile = () => {
-    reset({
-      files: {} as FileList,
-    });
+    console.log("Reset clicked");
+    setValue("files", {} as FileList);
   };
 
-  useEffect(() => {
-    const allowedExtensions = /(\.mp4|\..avi|\..mov|\..mkv|\.mp3)$/i;
+  const isLoading = isUploading || isGettingPresign || isCreatingPost;
 
-    if (!file) {
-      setError("files", {
-        type: "required",
-        message: "Le ficher est requis",
-      });
-      return;
-    }
-
-    if (!!file && !allowedExtensions.exec(file.name)) {
-      setError("files", {
-        type: "filetype",
-        message:
-          "Le ficher doit avoir une extension supportée. Les extensions: .mp4, .avi, .mov. .mkv ou .mp3 ",
-      });
-      return;
-    }
-
-    if (!!file && allowedExtensions.exec(file.name)) {
-      clearErrors("files");
-      getPresignMutation({ filename: file.name });
-    }
-  }, [file, setError, clearErrors, getPresignMutation]);
+  const isButtonDisabled = (!isValid && isSubmitted) || isLoading;
+  // // useEffect(() => {
+  //   if (Object.keys(errors?.files || {}).length > 0) {
+  //     console.log("Sending ");
+  //     getPresignMutation({ filename: file?.name || "" });
+  //   }
+  // // }, [file, errors, getPresignMutation]);
 
   return (
     <>
@@ -141,6 +127,7 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
           <h3 className="text-2xl font-extrabold tracking-tight sm:text-[2rem]">
             Créer une nouvelle publication
           </h3>
+          <span>{JSON.stringify(isValid)}</span>
           <div className="w-full max-w-md">
             <form noValidate onSubmit={handleSubmit(onSubmit)}>
               <main className="flex w-full items-center justify-center font-sans">
@@ -164,63 +151,99 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                       )}
                     </>
                   </div>
-                  {!!file ? (
-                    <div>
+
+                  <div>
+                    {!!file ? (
                       <FileCard
                         file={file}
                         complete={complete}
                         resetFile={resetFile}
+                        isValid={!errors?.files}
                       />
-                    </div>
-                  ) : (
-                    <div>
-                      <Label htmlFor="dropzone-file">
-                        Upload
-                        <div className="mx-auto flex w-full max-w-lg cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-blue-400 bg-white p-6 text-center">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-10 w-10 text-blue-500"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                            />
-                          </svg>
+                    ) : (
+                      <div>
+                        <Label htmlFor="dropzone-file">
+                          Upload
+                          <div className="mx-auto flex w-full max-w-lg cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-blue-400 bg-white p-6 text-center">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-10 w-10 text-blue-500"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                              />
+                            </svg>
 
-                          <h2 className="mt-4 text-xl font-medium tracking-wide text-gray-700">
-                            Ajouter le ficher son
-                          </h2>
+                            <h2 className="mt-4 text-xl font-medium tracking-wide text-gray-700">
+                              Ajouter le ficher son
+                            </h2>
 
-                          <p className="mt-2 tracking-wide text-gray-500">
-                            Le fichier doit être au format .mp4, .avi, .mov ou
-                            .mkv
-                          </p>
+                            <p className="mt-2 tracking-wide text-gray-500">
+                              Le fichier doit être au format .mp4, .avi, .mov ou
+                              .mkv
+                            </p>
+                          </div>
+                        </Label>
+                      </div>
+                    )}
 
-                          <input
-                            {...register("files", {
-                              required: "Le ficher est requis",
-                            })}
-                            id="dropzone-file"
-                            type="file"
-                            className="hidden"
-                          />
-                        </div>
-                      </Label>
-                      {!!errors?.files && (
-                        <div className="max-w-md">
-                          <span className="text-md mt-1 ml-1 flex items-center font-medium tracking-wide text-red-500">
-                            {errors?.files?.message}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    <input
+                      {...register("files", {
+                        validate: {
+                          required: (files) => {
+                            return (
+                              Object.keys(files).length > 0 ||
+                              "This field is required"
+                            );
+                          },
+                          lessThan10MB: (files) =>
+                            (!!files[0] && files[0].size < 10000000) ||
+                            "Max 10MB",
+                          acceptedFormats: (files) => {
+                            return (
+                              ["audio/mpeg"].includes(files[0]?.type || "") ||
+                              "Only Mp3 supported"
+                            );
+                          },
+                        },
+                        onChange: (event: ChangeEvent<HTMLInputElement>) => {
+                          const file = (
+                            (event?.target?.files || {}) as FileList
+                          )?.[0];
 
+                          if (
+                            !!file &&
+                            file.size < 10000000 &&
+                            ["audio/mpeg"].includes(file.type)
+                          ) {
+                            setComplete(0);
+
+                            getPresignMutation({
+                              filename:
+                                ((event?.target?.files || {}) as FileList)?.[0]
+                                  ?.name || "",
+                            });
+                          }
+                        },
+                      })}
+                      id="dropzone-file"
+                      type="file"
+                      className="hidden"
+                    />
+                    {!!errors?.files && (
+                      <div className="max-w-md">
+                        <span className="text-md mt-1 ml-1 flex items-center font-medium tracking-wide text-red-500">
+                          {errors?.files?.message}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-col">
                     <Label htmlFor="isPublic">Est public</Label>
                     <SwitchField
@@ -232,9 +255,14 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                   <div className="flex items-center justify-end">
                     <button
                       type="submit"
-                      className="flex shrink-0 items-center justify-center gap-x-2 rounded-lg border-2 border-gray-800 px-5 py-2 text-sm tracking-wide text-gray-800 transition-colors duration-200 hover:bg-gray-800 hover:text-white sm:w-auto"
+                      disabled={isButtonDisabled}
+                      className={`${
+                        isButtonDisabled
+                          ? "cursor-not-allowed rounded  border-gray-500 py-2 px-4 font-bold text-gray-500  opacity-50"
+                          : ""
+                      } flex shrink-0 items-center justify-center gap-x-2 rounded-lg border-2 border-gray-800 px-5 py-2 text-sm tracking-wide text-gray-800 transition-colors duration-200 hover:bg-gray-800 hover:text-white sm:w-auto`}
                     >
-                      <span>Ajouter</span>
+                      {isLoading ? <LoadingDots /> : <span>Ajouter</span>}
                     </button>
                   </div>
                 </div>

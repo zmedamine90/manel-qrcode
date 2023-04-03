@@ -32,7 +32,6 @@ export const postRouter = createTRPCRouter({
   getPost: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      console.log({ idUser: ctx.session?.user.id });
       const post = await ctx.prisma.post.findFirst({
         where: {
           id: input.id,
@@ -54,13 +53,14 @@ export const postRouter = createTRPCRouter({
   deletePost: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const post = await ctx.prisma.post.findUnique({
+      const post = await ctx.prisma.post.findFirst({
         select: {
           id: true,
           filename: true,
           userId: true,
         },
         where: {
+          userId: ctx.session?.user.id,
           id: input.id,
         },
       });
@@ -85,7 +85,11 @@ export const postRouter = createTRPCRouter({
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
-    const posts = await ctx.prisma.post.findMany();
+    const posts = await ctx.prisma.post.findMany({
+      where: {
+        userId: ctx.session?.user.id,
+      },
+    });
 
     const postsWithUrl = await Promise.all(
       posts.map(

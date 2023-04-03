@@ -1,22 +1,16 @@
-import React from "react";
-import LoadingDots from "../LoadingDots";
+import React, { useState } from "react";
 import { AwesomeQR } from "awesome-qr";
 import { PostType } from "@/server/api/routers/post";
 import Link from "next/link";
 import { FiTrash2 } from "react-icons/fi";
-import { api } from "@/utils/api";
+import { ModalDeleteConfirmation } from "../Modal";
 
 type PostCardProps = {
   post: PostType;
 };
 
 function PostCard({ post }: PostCardProps): JSX.Element {
-  const trpc = api.useContext();
-  const { mutate: deletePost, isLoading } = api.post.deletePost.useMutation({
-    onSuccess: async () => {
-      await trpc.post.getAll.invalidate();
-    },
-  });
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const downloadQrcode = async () => {
     const url = `${process.env.NEXT_PUBLIC_APP_URL || ""}/posts/${post.id}`;
@@ -71,10 +65,8 @@ function PostCard({ post }: PostCardProps): JSX.Element {
               </div>
             </button>
             <button
-              onClick={() => deletePost({ id: post.id })}
-              className={`w-12 ${
-                true ? "cursor-not-allowed bg-gray-100" : ""
-              }bg-white  justify-center rounded-md border border-solid border-red-500 py-1.5 text-sm text-red-700 transition-all duration-150 ease-in-out hover:bg-white hover:text-red-500 focus:outline-none`}
+              onClick={() => setIsOpen(true)}
+              className={`w-12 justify-center  rounded-md border border-solid border-red-500 bg-white py-1.5 text-sm text-red-700 transition-all duration-150 ease-in-out hover:bg-white hover:text-red-500 focus:outline-none`}
             >
               <div className="flex justify-center">
                 <FiTrash2 />
@@ -90,10 +82,11 @@ function PostCard({ post }: PostCardProps): JSX.Element {
               />
             </button> */}
           </div>
-          <button
-            onClick={() => downloadQrcode()}
-            className="bg-grey-light hover:bg-grey text-grey-darkest inline-flex items-center rounded py-2 px-4 font-bold"
-          ></button>
+          <ModalDeleteConfirmation
+            post={post}
+            isOpen={isOpen}
+            setIsOpen={setIsOpen}
+          />
         </div>
       </div>
     </div>
