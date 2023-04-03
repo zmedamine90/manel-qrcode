@@ -199,16 +199,16 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                           required: (files) => {
                             return (
                               Object.keys(files).length > 0 ||
-                              "This field is required"
+                              "Le champs ficher est requis"
                             );
                           },
                           lessThan10MB: (files) =>
                             (!!files[0] && files[0].size < 10000000) ||
-                            "Max 10MB",
+                            "Le ficher dépasse la taille autorisée ( 10 mb)",
                           acceptedFormats: (files) => {
                             return (
                               ["audio/mpeg"].includes(files[0]?.type || "") ||
-                              "Only Mp3 supported"
+                              "Le format n'est pas supporté. Uniquement mp3"
                             );
                           },
                         },

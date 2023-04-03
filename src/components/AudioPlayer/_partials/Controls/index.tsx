@@ -64,7 +64,12 @@ const Controls = ({
     <>
       <div className="h-control-panel bg-control-panel-light-background dark:bg-control-panel-dark-background z-50 flex justify-center   rounded-b-xl border-t border-gray-200 px-10 py-10  dark:border-gray-900">
         <div className=" amplitude-play-pause border-play-pause-light-border dark:bg-play-pause-dark-background dark:border-play-pause-dark-border flex h-40 w-40  cursor-pointer rounded-full border bg-white shadow-xl">
-          <button onClick={togglePlayPause} className="w-full">
+          <button
+            onClick={togglePlayPause}
+            className="w-full"
+            role="Jouer / pauser le son"
+            aria-label="Jouer / pauser le son"
+          >
             {!isPlaying ? (
               <svg
                 id="play-icon"
