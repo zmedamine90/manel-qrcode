@@ -206,7 +206,9 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                             "Le ficher dépasse la taille autorisée ( 10 mb)",
                           acceptedFormats: (files) => {
                             return (
-                              ["audio/mpeg"].includes(files[0]?.type || "") ||
+                              ["audio/mpeg", "audio/aac"].includes(
+                                files[0]?.type || ""
+                              ) ||
                               "Le format n'est pas supporté. Formats supportés: mp3, aac"
                             );
                           },
