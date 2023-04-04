@@ -185,8 +185,7 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                             </h2>
 
                             <p className="mt-2 tracking-wide text-gray-500">
-                              Le fichier doit être au format .mp4, .avi, .mov ou
-                              .mkv
+                              Le fichier doit être au format .mp3 ou .aac
                             </p>
                           </div>
                         </Label>
@@ -208,7 +207,7 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                           acceptedFormats: (files) => {
                             return (
                               ["audio/mpeg"].includes(files[0]?.type || "") ||
-                              "Le format n'est pas supporté. Uniquement mp3"
+                              "Le format n'est pas supporté. Formats supportés: mp3, aac"
                             );
                           },
                         },
@@ -220,7 +219,7 @@ const NewPost: NextPage<{ protectedProp: boolean }> = ({ protectedProp }) => {
                           if (
                             !!file &&
                             file.size < 10000000 &&
-                            ["audio/mpeg"].includes(file.type)
+                            ["audio/mpeg", "audio/aac"].includes(file.type)
                           ) {
                             setComplete(0);
 
