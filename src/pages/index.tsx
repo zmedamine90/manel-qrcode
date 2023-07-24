@@ -11,6 +11,7 @@ const Home: NextPage = () => {
   const { data: sessionData } = useSession();
   const router = useRouter();
 
+  // Init branch add loading
   const handleClick = () => {
     router
       .push("/posts/new")
